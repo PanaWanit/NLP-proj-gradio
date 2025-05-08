@@ -58,7 +58,7 @@ dc = model[2]
 extra= model[3]
 alll = list(model).copy()
 
-emb, factorr = clip_model.encode_text(["<Gradio Input>"], device="cuda").float(), 20
+emb, factorr = clip_model.encode_text(["ผ้าพันคอ ผ้าพันคอ ตุ๊กตา สีเหลือง"], device="cuda").float(), 20
 
 emb = emb.detach().cpu().numpy()
 emb = pca.transform(emb)

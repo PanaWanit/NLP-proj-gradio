@@ -13,7 +13,7 @@ pip install gradio
 gradio app.py
 ```
 
-# Demo
+# Preview
 ## Train GSS
 ![Train GSS](images/train_gss.png)
 ## Point cloud search
