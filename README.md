@@ -20,3 +20,6 @@ gradio app.py
 ![Point cloud search](images/point_cloud_search.png)
 ### Result
 ![Result](images/sibr_viewer_preview.png)
+
+# TODO
+- [ ] custom highlight color
