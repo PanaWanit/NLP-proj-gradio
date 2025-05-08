@@ -12,3 +12,11 @@ pip install gradio
 ```bash
 gradio app.py
 ```
+
+# Demo
+## Train GSS
+![Train GSS](images/train_gss.png)
+## Point cloud search
+![Point cloud search](images/point_cloud_search.png)
+### Result
+![Result](images/sibr_viewer_preview.png)
