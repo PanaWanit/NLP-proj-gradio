@@ -2,8 +2,52 @@ import gradio as gr
 import subprocess
 import os
 import platform
+import shutil
+import sys
 
-def run_gaussian_feature_extractor(model_path, iteration, feature_level):
+def langsplat_preprocess(dataset_path):
+    # Validate inputs
+    if not dataset_path:
+        return "Error: Dataset path is required."
+    if not os.path.exists(dataset_path):
+        return f"Error: Dataset path '{dataset_path}' does not exist."
+
+    # Construct the command
+    command = [
+        "python",
+        "LangSplt_preprocess.py",
+        "--dataset_path", dataset_path
+    ]
+
+    try:
+        # Run the command and capture output
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        output = result.stdout
+        if not output:
+            output = "Command executed successfully, but no output was produced."
+        # Remove the old language features directory
+        old_lang_feat_dir = os.path.join(dataset_path, "language_features")
+        new_lang_feat_dir = os.path.join(dataset_path, "language_features_sip")
+        if os.path.exists(new_lang_feat_dir):
+            shutil.rmtree(new_lang_feat_dir)
+        # Rename the new language features directory
+        if os.path.exists(old_lang_feat_dir):
+            os.rename(old_lang_feat_dir, new_lang_feat_dir)
+        else:
+            return f"Error: New language features directory '{new_lang_feat_dir}' does not exist."
+    
+        return output
+    except subprocess.CalledProcessError as e:
+        return f"Error: Command failed with exit code {e.returncode}\n{e.stderr}"
+    except Exception as e:
+        return f"Error: An unexpected error occurred: {str(e)}"
+
+def run_gaussian_feature_extractor(pca_model_path, model_path, iteration, feature_level):
     # Validate inputs
     if not model_path:
         return "Error: Model path is required."
@@ -26,6 +70,7 @@ def run_gaussian_feature_extractor(model_path, iteration, feature_level):
     command = [
         "python",
         "gaussian_feature_extractor.py",
+        "-p", pca_model_path,
         "-m", model_path,
         "--iteration", str(iteration),
         "--feature_level", str(feature_level)
@@ -130,6 +175,9 @@ def run_evaluation(model_path, iteration, feature_level, dataset_name, feat_fold
         "./output", "3DOVS", dataset_name, "test", f"feat_{feature_level}", "renders_npy"
     )
 
+    source_path = os.path.abspath(source_path)
+    target_path = os.path.abspath(target_path)
+
     # Validate source path
     if not os.path.exists(source_path):
         return f"Error: Source path for symbolic link '{source_path}' does not exist."
@@ -176,7 +224,7 @@ def run_evaluation(model_path, iteration, feature_level, dataset_name, feat_fold
         "eval/evaluate_iou_3dovs.py",
         "--dataset_name", dataset_name,
         "--feat_folder", feat_folder,
-        "--gt_folder", gt_folder
+        "--gt_folder", gt_folder,
     ]
 
     try:
@@ -199,11 +247,43 @@ def run_evaluation(model_path, iteration, feature_level, dataset_name, feat_fold
 def gaussian_feature_processing_tab():
     with gr.TabItem("Gaussian Feature Processing"):
         with gr.Column():
+            # LangSplat
+            '''
+            python LangSplt_preprocess.py --dataset_path ./dataset/lerf_ovs/sofa/
+            rm -rf ./dataset/lerf_ovs/sofa/language_features_sip
+            mv ./dataset/lerf_ovs/sofa/language_features/ ./dataset/lerf_ovs/sofa/language_features_sip
+            '''
+            with gr.Column():
+                with gr.Row():
+                    with gr.Column():
+                        gr.Markdown("## Run LangSplat Preprocess")
+                        dataset_path = gr.Textbox(
+                            label="Dataset Path",
+                            value="./dataset/lerf_ovs/sofa/",
+                            placeholder="Path to dataset"
+                        )
+                    with gr.Column():
+                        gr.Markdown("## Preprocess Output")
+                        preprocess_output = gr.Textbox(label="Preprocess Output", lines=10)
+                preprocess_run_button = gr.Button("Run Preprocess")
+                preprocess_run_button.click(
+                    fn=langsplat_preprocess,
+                    inputs=dataset_path,
+                    outputs=preprocess_output
+                )
+
+
+
             # Gaussian Feature Extractor Section
             with gr.Column():
                 with gr.Row():
                     with gr.Column():
                         gr.Markdown("## Run Gaussian Feature Extractor")
+                        pca_model_path = gr.Textbox(
+                            label="pca model path",
+                            value="./dataset/lerf_ovs/sofa/pca_model.joblib",
+                            placeholder="Path to pca model directory"
+                        )
                         extractor_model_path = gr.Textbox(
                             label="Model Path (-m)",
                             value="./output/sofa_small_3_3",
@@ -227,7 +307,7 @@ def gaussian_feature_processing_tab():
                 extractor_run_button = gr.Button("Run Extractor")
                 extractor_run_button.click(
                     fn=run_gaussian_feature_extractor,
-                    inputs=[extractor_model_path, extractor_iteration, extractor_feature_level],
+                    inputs=[pca_model_path, extractor_model_path, extractor_iteration, extractor_feature_level],
                     outputs=extractor_output
                 )
 

@@ -1,6 +1,8 @@
 import gradio as gr
 import subprocess
 import os
+# import threading
+
 
 def train_gss_tab():
     def run_training(
@@ -26,33 +28,49 @@ def train_gss_tab():
         ]
 
         # Ensure the dataset path and output directory exist
-        # if not os.path.exists(dataset_path):
-        #     return f"Error: Dataset path '{dataset_path}' does not exist."
-        # os.makedirs(output_dir, exist_ok=True)
+        if not os.path.exists(dataset_path):
+            return f"Error: Dataset path '{dataset_path}' does not exist."
+        os.makedirs(output_dir, exist_ok=True)
 
         try:
             # Run the command asynchronously and capture output
             process = subprocess.Popen(
                 cmd,
+                stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
                 bufsize=1,
-                universal_newlines=True
+                # universal_newlines=True,
             )
-            output = []
-            for line in iter(process.stdout.readline, ""):
-                output.append(line)
-                yield "\n".join(output)
 
-            stderr = process.stderr.read()
-            process.stdout.close()
-            process.stderr.close()
-            return_code = process.wait()
 
-            if return_code != 0:
-                    return f"Training failed with error:\n{stderr}"
-            return "\n".join(output) + "\nTraining completed successfully!"
+
+            # process = subprocess.run(
+            #     cmd,
+            #     stdin=subprocess.PIPE,
+            #     stdout=subprocess.PIPE,
+            #     stderr=subprocess.PIPE,
+            #     text=True,
+            #     bufsize=1,
+            #     universal_newlines=True,
+            # )
+
+            output, err = process.communicate()
+            # return_code = process.wait()
+            # output = []
+            # for line in iter(process.stdout.readline, ""):
+            #     output.append(line)
+            #     yield "\n".join(output)
+
+            # stderr = process.stderr.read()
+            # process.stdout.close()
+            # process.stderr.close()
+
+            if process.returncode != 0:
+                    return f"Training failed with error:\n{err}"
+            return output + "\nTraining completed successfully!"
+        
 
         except Exception as e:
             return f"Error running train.py: {str(e)}"
@@ -118,17 +136,22 @@ def train_gss_tab():
                 densify_until_iter,
                 percent_dense
             ],
-            outputs=output
+            # outputs=output
         )
         gr.Markdown("## View Model (After Training)")
+        show_iteration = gr.Number(
+                    label="show Iterations (--iteration)",
+                    value=15000,
+                    precision=0
+                )
         view_model_button = gr.Button("View Model")
         view_model_button.click(
-            fn=lambda: subprocess.Popen(
-                ["./SIBR_viewers/install/bin/SIBR_gaussianViewer_app", "-m", output_dir],
+            fn=lambda output_dir, show_iteration: subprocess.Popen(
+                ["./SIBR_viewers/install/bin/SIBR_gaussianViewer_app", "-m", output_dir, "--iteration", str(show_iteration)],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
             ),
-            inputs=[],
+            inputs=[output_dir, show_iteration],
             outputs=[]
         )
         # This will open the viewer in a new window

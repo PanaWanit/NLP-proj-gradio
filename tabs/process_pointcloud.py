@@ -3,12 +3,17 @@ import torch
 import numpy as np
 from sklearn.decomposition import PCA
 from plyfile import PlyData, PlyElement
-from SigLIP2_encoder import SigLIP2Network as OpenCLIPNetwork
+
 import cv2
 import matplotlib.pyplot as plt
 import joblib
 import os
+from SigLIP2_encoder import SigLIP2Network as OpenCLIPNetwork
+import subprocess
+import gc
 
+# clip_model = OpenCLIPNetwork("cuda")
+# clip_model.model.cpu()
 # class OpenCLIPNetwork:
 #     def __init__(self, device):
 #         self.device = device
@@ -59,7 +64,7 @@ def process_point_cloud(pca_model_path, model_file_path, search_text, output_dir
 
     try:
         # Initialize CLIP model
-        clip_model = OpenCLIPNetwork("cuda")
+        # clip_model = my_clip_model
 
         # Load PCA model
         pca = joblib.load(pca_model_path)
@@ -75,7 +80,11 @@ def process_point_cloud(pca_model_path, model_file_path, search_text, output_dir
         opacities = model[6]
 
         # Encode search text
+        clip_model = OpenCLIPNetwork("cuda")
         emb, factorr = clip_model.encode_text([search_text], device="cuda").float(), 20
+        del clip_model
+        gc.collect()
+        torch.cuda.empty_cache()
         emb = emb.detach().cpu().numpy()
         emb = pca.transform(emb)
         emb = torch.from_numpy(emb).cuda()
@@ -152,12 +161,12 @@ def point_cloud_search_tab():
                 gr.Markdown("## Point Cloud Search and Processing")
                 pca_model_path = gr.Textbox(
                     label="PCA Model File",
-                    value="./pca_model.joblib",
+                    value="./dataset/lerf_ovs/sofa/pca_model.joblib",
                     placeholder="Path to PCA model file (joblib)"
                 )
                 model_file_path = gr.Textbox(
                     label="Model File",
-                    value="./chkpnt15000_langfeat_1.pth",
+                    value="./output/sofa_small_3_3/chkpnt15000_langfeat_1.pth",
                     placeholder="Path to model checkpoint file (pth)"
                 )
                 search_text = gr.Textbox(
@@ -166,7 +175,7 @@ def point_cloud_search_tab():
                 )
                 output_directory = gr.Textbox(
                     label="Output Directory",
-                    value="./point_cloud/iteration_150004",
+                    value="./output/sofa_small_3_3/point_cloud/iteration_150001",
                     placeholder="Directory to save point cloud PLY file"
                 )
             with gr.Column():
@@ -178,6 +187,27 @@ def point_cloud_search_tab():
             fn=process_point_cloud,
             inputs=[pca_model_path, model_file_path, search_text, output_directory],
             outputs=[output_status, output_plot]
+        )
+        gr.Markdown("## View Model (After Prompting)")
+        output_dir = gr.Textbox(
+                    label="Output Directory (-m)",
+                    value="./output/sofa_small_3_3",
+                    placeholder="Path to output directory"
+                )
+        show_iteration = gr.Number(
+                    label="show Iterations (--iteration)",
+                    value=150001,
+                    precision=0
+                )
+        view_model_button = gr.Button("View Model")
+        view_model_button.click(
+            fn=lambda output_dir, show_iteration: subprocess.Popen(
+                ["./SIBR_viewers/install/bin/SIBR_gaussianViewer_app", "-m", output_dir, "--iteration", str(show_iteration)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            ),
+            inputs=[output_dir, show_iteration],
+            outputs=[]
         )
 
     return gr.TabItem
