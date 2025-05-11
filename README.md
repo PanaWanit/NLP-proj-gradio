@@ -22,4 +22,4 @@ gradio app.py
 ![Result](images/sibr_viewer_preview.png)
 
 # TODO
-- [ ] custom highlight color
+- [x] custom highlight color
