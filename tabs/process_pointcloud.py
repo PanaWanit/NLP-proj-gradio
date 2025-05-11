@@ -8,12 +8,29 @@ import cv2
 import matplotlib.pyplot as plt
 import joblib
 import os
-from SigLIP2_encoder import SigLIP2Network as OpenCLIPNetwork
+
+CLIP_SELECT = False
+if CLIP_SELECT:
+    from tabs.openclip_encoder import OpenCLIPNetwork
+else:
+    from SigLIP2_encoder import SigLIP2Network as OpenCLIPNetwork
+
 import subprocess
 import gc
+from PIL import ImageColor
+import re
 
-# clip_model = OpenCLIPNetwork("cuda")
-# clip_model.model.cpu()
+def rgba_to_hex(rgba):
+    match = re.match(r'rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)', rgba)
+    if not match:
+        return "Invalid color format"
+    # assert len(match.groups()) == 3, "Invalid color format"
+    # assert False, match.groups()
+    r, g, b = match.groups()
+    r, g, b = int(float(r)), int(float(g)), int(float(b))
+    return r, g, b
+
+
 # class OpenCLIPNetwork:
 #     def __init__(self, device):
 #         self.device = device
@@ -30,7 +47,8 @@ import gc
 #         return torch.randn(len(images), 512).to(device)  # Dummy tensor for illustration
     
 
-def process_point_cloud(pca_model_path, model_file_path, search_text, output_directory):
+def process_point_cloud(pca_model_path, model_file_path, search_text, output_directory, col, top_k_inv):
+    # assert False, col
     """
     Process a point cloud by searching for features matching the input text using CLIP and PCA.
     Saves the modified point cloud as a PLY file and generates a cosine similarity histogram.
@@ -81,7 +99,8 @@ def process_point_cloud(pca_model_path, model_file_path, search_text, output_dir
 
         # Encode search text
         clip_model = OpenCLIPNetwork("cuda")
-        emb, factorr = clip_model.encode_text([search_text], device="cuda").float(), 20
+        # assert False, f"{top_k_inv} {type(top_k_inv)}"
+        emb, factorr = clip_model.encode_text([search_text], device="cuda").float(), top_k_inv
         del clip_model
         gc.collect()
         torch.cuda.empty_cache()
@@ -98,8 +117,11 @@ def process_point_cloud(pca_model_path, model_file_path, search_text, output_dir
         selected = (selected - selected.min()) / (selected.max() - selected.min())
 
         # Modify point cloud properties
+        # assert False, f"hello"
+        R, G, B = rgba_to_hex(col)
         with torch.no_grad():
-            dc[idx.indices, ...] = torch.tensor([0.0, 10, 0.0], device="cuda")
+            dc[idx.indices, ...] = torch.tensor([R*10/255, G*10/255, B*10/255], device="cuda")
+            # dc[idx.indices, ...] = torch.tensor([0.0, 10.0, 0.0], device="cuda")
             extra[idx.indices, ...] = torch.tensor([0.0, 0.0, 0.0], device="cuda")
 
         # Prepare PLY file header
@@ -171,12 +193,26 @@ def point_cloud_search_tab():
                 )
                 search_text = gr.Textbox(
                     label="Text to Search",
-                    placeholder="Enter text to search in point cloud"
+                    placeholder="Enter text to search in point cloud",
+                    value="pikachu"
+                )
+                #slider here#
+                top_inv = gr.Slider(
+                    label="Top K inverted",
+                    minimum=1,
+                    maximum=100,
+                    value=20,
+                    step=1,
+                    interactive=True
                 )
                 output_directory = gr.Textbox(
                     label="Output Directory",
                     value="./output/sofa_small_3_3/point_cloud/iteration_150001",
                     placeholder="Directory to save point cloud PLY file"
+                )
+                result_color = gr.ColorPicker(
+                    label="Highlight Color",
+                    value="rgba(0, 255, 228.99999999999997, 1)"  # Default to red
                 )
             with gr.Column():
                 gr.Markdown("## Processing Output")
@@ -185,7 +221,7 @@ def point_cloud_search_tab():
         run_button = gr.Button("Process Point Cloud")
         run_button.click(
             fn=process_point_cloud,
-            inputs=[pca_model_path, model_file_path, search_text, output_directory],
+            inputs=[pca_model_path, model_file_path, search_text, output_directory, result_color, top_inv],
             outputs=[output_status, output_plot]
         )
         gr.Markdown("## View Model (After Prompting)")

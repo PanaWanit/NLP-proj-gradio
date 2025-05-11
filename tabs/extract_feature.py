@@ -5,6 +5,8 @@ import platform
 import shutil
 import sys
 
+CLIP_SELECT = False
+
 def langsplat_preprocess(dataset_path):
     # Validate inputs
     if not dataset_path:
@@ -36,7 +38,7 @@ def langsplat_preprocess(dataset_path):
         if os.path.exists(new_lang_feat_dir):
             shutil.rmtree(new_lang_feat_dir)
         # Rename the new language features directory
-        if os.path.exists(old_lang_feat_dir):
+        if os.path.exists(old_lang_feat_dir) and CLIP_SELECT:
             os.rename(old_lang_feat_dir, new_lang_feat_dir)
         else:
             return f"Error: New language features directory '{new_lang_feat_dir}' does not exist."
